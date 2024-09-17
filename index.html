@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Platform with GLB Model</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, arrow, controls;
+
+        // Set up your coordinates (latitude/longitude)
+        const originLat = 10.767089; // Latitude of the origin (fixed point)
+        const originLong = 78.813181; // Longitude of the origin (fixed point)
+
+        // Conversion from lat/long to X/Z for Three.js
+        function latLongToXY(lat, long, originLat, originLong) {
+            const latDiff = lat - originLat;
+            const longDiff = long - originLong;
+            const x = longDiff * 111320 * Math.cos(originLat * Math.PI / 180); // Longitude to meters
+            const z = latDiff * 111320; // Latitude to meters
+            return { x, z };
+        }
+
+        // Initialize Three.js
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-10, 20, 110); // Adjust camera for visibility
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+            
+
+            // Add ambient light to the scene
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Soft white light
+            scene.add(ambientLight);
+            scene.background = new THREE.Color(0xD0E9FF);
+
+            // Add directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(0, 100, 0); // Above the scene
+            scene.add(directionalLight);
+
+            // Load the GLB file
+            const loader = new THREE.GLTFLoader();
+            loader.load('plot.glb', function(gltf) {
+                const model = gltf.scene;
+                scene.add(model);
+
+                // Find the meshes by name
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        if (child.name === "Plane") {
+                            child.userData = { name: "hostel", washrooms: 5, "waiting area": 8 };
+                        }
+                        if (child.name === "arrow") {
+                            arrow = child; // Assign arrow to a variable for later use
+                            arrow.userData = { name: "shivam" };
+                        }
+                    }
+                });
+
+                // Log userData for Plane and Arrow
+                console.log("Plane UserData:", model.getObjectByName("Plane").userData);
+                console.log("Arrow UserData:", model.getObjectByName("arrow").userData);
+            });
+
+            // OrbitControls`
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 10;
+            controls.maxDistance = 500;
+
+            // Set initial arrow position (user movement)
+            function updateUserPosition(lat, long) {
+                const userPos = latLongToXY(lat, long, originLat, originLong);
+                if (arrow) {
+                    arrow.position.set(userPos.x, arrow.position.y, userPos.z); // Keep arrow's Y position the same
+                }
+            }
+
+            // Use Geolocation API to fetch user location every 2 seconds
+            if (navigator.geolocation) {
+                setInterval(() => {
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        const lat = position.coords.latitude;
+                        const long = position.coords.longitude;
+                        updateUserPosition(lat, long);
+                        console.log("Updated User Position: ", { lat, long });
+                    });
+                }, 2000); // Fetch user location every 2 seconds
+            } else {
+                console.log("Geolocation is not supported by this browser.");
+            }
+
+            animate();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize the scene
+        init();
+    </script> 
+</body>
+</html>
